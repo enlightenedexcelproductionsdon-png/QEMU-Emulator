@@ -1,0 +1,888 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>QEMU Config Builder — Full HTML5 Single File (Comprehensive)</title>
+  <meta name="description" content="Comprehensive QEMU command builder UI with sound cards, VGA, disks, ISO, machine types, arch, VM actions, presets, save/load, and export." />
+  <style>
+    /*
+      Comprehensive CSS for the QEMU Config Builder.
+      This block is intentionally long and descriptive to make the single-file project self-contained.
+      It handles layout, responsive grid, form styling, accessible focus states, tooltips, and print.
+    */
+    :root{
+      --bg: #f7fbff;
+      --card: #ffffff;
+      --muted: #6b7280;
+      --accent: #1f6feb;
+      --danger: #dc2626;
+      --success: #16a34a;
+      --shadow: 0 8px 30px rgba(8,15,30,0.06);
+      --radius: 12px;
+      --max-width: 1200px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", "Courier New", monospace;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;color:#0b1220;background:linear-gradient(180deg,#eef6ff,#ffffff);-webkit-font-smoothing:antialiased;}
+    .wrap{max-width:var(--max-width);margin:28px auto;padding:20px}
+    header{display:flex;align-items:flex-start;gap:16px;margin-bottom:16px}
+    header h1{margin:0;font-size:1.4rem}
+    header p{margin:4px 0 0;color:var(--muted);font-size:.95rem}
+    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
+    .card{grid-column:span 12;background:var(--card);padding:16px;border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid rgba(10,20,40,0.03)}
+    /* larger screens: sidebar + main area */
+    @media(min-width:1000px){
+      .card.sidebar{grid-column:span 4}
+      .card.main{grid-column:span 8}
+    }
+    .card h2{margin:0 0 8px 0;font-size:1.05rem}
+    label{display:block;margin:6px 0;color:#111;font-size:.96rem}
+    select,input[type="number"],input[type="text"],textarea{padding:10px;border-radius:8px;border:1px solid #e6eef8;width:100%;max-width:100%;font-size:.95rem}
+    input[type="file"]{padding:6px}
+    .small{font-size:.85rem;color:var(--muted)}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    .btn{padding:8px 12px;border-radius:9px;border:1px solid rgba(0,0,0,0.06);background:white;cursor:pointer;transition:all .12s}
+    .btn.primary{background:var(--accent);color:white;border:none}
+    .btn.danger{background:var(--danger);color:white;border:none}
+    .btn.ghost{background:transparent;border:1px solid #e6eef8}
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+    .muted{color:var(--muted)}
+    .form-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .form-row > *{flex:1}
+    .sound-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin-top:8px}
+    .sound-option{display:flex;align-items:center;gap:8px;padding:8px;border-radius:8px;border:1px solid #eef6ff;background:#fbfdff}
+    .disk-row{display:flex;gap:8px;align-items:center;margin:8px 0}
+    .disk-row select,.disk-row input[type="file"]{flex:1}
+    pre.command{background:#0b1220;color:#dbeafe;padding:12px;border-radius:8px;overflow:auto;font-family:var(--mono);white-space:pre-wrap}
+    .note{color:var(--muted);font-size:.9rem;margin-top:8px}
+    footer{margin-top:16px;text-align:center;color:var(--muted);font-size:.9rem}
+    .vm-state{font-weight:700;margin:6px 0}
+    .bad{color:var(--danger)}
+    .good{color:var(--success)}
+    .tooltip{position:relative;display:inline-block}
+    .tooltip .tt{visibility:hidden;width:260px;background:#111;color:#fff;text-align:left;border-radius:8px;padding:8px;position:absolute;z-index:10;bottom:125%;left:50%;transform:translateX(-50%);opacity:0;transition:opacity .12s}
+    .tooltip:hover .tt{visibility:visible;opacity:1}
+    /* file list and saved configs */
+    .saved-list{display:flex;flex-direction:column;gap:6px}
+    .chip{display:inline-flex;align-items:center;gap:8px;padding:6px 8px;border-radius:999px;background:#f1f7ff;border:1px solid rgba(31,111,235,0.08)}
+    .kbd{background:#0b1220;color:#e6f0ff;padding:3px 6px;border-radius:6px;font-family:var(--mono);font-size:.85rem}
+    /* long descriptive area */
+    .long-help{max-height:260px;overflow:auto;padding:8px;border-radius:8px;border:1px dashed #e6eef8;background:linear-gradient(180deg,#ffffff,#fbfdff)}
+  </style>
+</head>
+<body>
+  <div class="wrap" role="main" aria-labelledby="title">
+    <header>
+      <div>
+        <h1 id="title">QEMU Config Builder — HTML5 All-in-One</h1>
+        <p>Comprehensive UI for building qemu-system commands. Frontend-only: generates commands, simulates VM state, and exports scripts. Use a backend to run VMs on a host.</p>
+      </div>
+    </header>
+
+    <div class="grid" role="region" aria-label="QEMU builder grid">
+
+      <!-- Sidebar: Options -->
+      <section class="card sidebar" aria-labelledby="sidebarTitle">
+        <h2 id="sidebarTitle">Quick Options & Actions</h2>
+
+        <label>
+          Architecture
+          <select id="archSelect" aria-label="Architecture select">
+            <option value="x64">x64 (qemu-system-x86_64)</option>
+            <option value="x32">x86 (qemu-system-i386)</option>
+          </select>
+        </label>
+
+        <label>
+          Machine Type
+          <select id="machineSelect" aria-label="Machine type select"></select>
+        </label>
+
+        <label class="form-row" aria-label="Memory and CPU">
+          <span style="min-width:110px">Memory (MB)</span>
+          <input id="memInput" type="number" min="64" step="64" value="2048" aria-label="Memory in megabytes">
+          <span style="min-width:80px">CPUs</span>
+          <input id="cpuInput" type="number" min="1" max="64" value="2" aria-label="CPU count">
+        </label>
+
+        <label>
+          VGA
+          <select id="vgaSelect" aria-label="VGA select">
+            <option value="std">std (standard VGA)</option>
+            <option value="cirrus">cirrus</option>
+            <option value="qxl">qxl</option>
+            <option value="vmware">vmware</option>
+            <option value="none">none</option>
+          </select>
+        </label>
+
+        <label>
+          KVM
+          <select id="kvmSelect" aria-label="KVM enable">
+            <option value="auto">-enable-kvm (recommended when available)</option>
+            <option value="no">Do not enable KVM</option>
+          </select>
+        </label>
+
+        <div style="margin-top:8px" aria-hidden="false">
+          <div class="vm-state" id="vmState">State: stopped</div>
+          <div class="controls">
+            <button id="startBtn" class="btn primary" aria-pressed="false">Start</button>
+            <button id="stopBtn" class="btn danger" disabled>Stop</button>
+            <button id="pauseBtn" class="btn" disabled>Pause</button>
+            <button id="suspendBtn" class="btn" disabled>Suspend</button>
+          </div>
+        </div>
+
+        <hr style="margin:12px 0;border:none;border-top:1px solid #eef6ff" />
+
+        <h3 style="margin:6px 0">Profiles & saved configs</h3>
+        <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+          <button id="saveConfigBtn" class="btn ghost">Save Config</button>
+          <button id="loadConfigBtn" class="btn ghost">Load Config</button>
+          <button id="exportJsonBtn" class="btn">Export JSON</button>
+        </div>
+        <div class="saved-list" id="savedList" aria-live="polite"></div>
+
+        <hr style="margin:12px 0;border:none;border-top:1px solid #eef6ff" />
+        <div class="long-help" tabindex="0" aria-label="Help and notes">
+          <strong>Notes:</strong>
+          <ul>
+            <li>This UI generates qemu-system command lines based on your selections. It does <em>not</em> run QEMU itself — to run, copy the generated command to a QEMU host and ensure file paths point to host-readable images.</li>
+            <li>Sound device names and machine types differ across QEMU versions. Use <code>qemu-system-x86_64 -machine help</code> and <code>-soundhw ?</code> on your host to confirm names if needed.</li>
+            <li>To actually control VMs remotely, implement a backend to accept uploads and execute commands securely (and integrate QMP or libvirt for safe operations).</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Main: Detailed configuration -->
+      <section class="card main" aria-labelledby="mainTitle">
+        <h2 id="mainTitle">Detailed VM Configuration</h2>
+
+        <!-- Sound cards: 13 options -->
+        <div style="margin-bottom:12px">
+          <h3 style="margin:0 0 6px 0">Sound Cards (select one or more)</h3>
+          <p class="small muted" style="margin:0 0 8px 0">The builder supports legacy <code>-soundhw</code> flags, modern <code>-device</code> models, and placeholders. Pick any combination; review the generated command since some QEMU versions differ.</p>
+          <div id="soundOptions" class="sound-grid" role="group" aria-label="Sound card options"></div>
+        </div>
+
+        <!-- Disks -->
+        <div style="margin-bottom:12px">
+          <h3 style="margin:0 0 6px 0">Hard Disks (HDA, HDB, HDC, HDD)</h3>
+          <p class="small muted">Up to 4 IDE-style disks. Choose file(s) on your client — filenames are used as placeholders in the generated command. Supported formats: QCOW2, VHD, VDI, VMDK, IMG.</p>
+          <div id="disksContainer" aria-live="polite"></div>
+          <div class="controls" style="margin-top:8px">
+            <button id="addDiskBtn" class="btn">Add Disk</button>
+            <button id="clearDisksBtn" class="btn ghost">Clear Disks</button>
+          </div>
+        </div>
+
+        <!-- ISO / removable ROM -->
+        <div style="margin-bottom:12px">
+          <h3 style="margin:0 0 6px 0">Removable ROM / ISO</h3>
+          <label>
+            ISO file
+            <input id="isoInput" type="file" accept=".iso,application/x-iso,application/octet-stream" aria-label="ISO file upload">
+          </label>
+          <label>
+            Attach ISO as
+            <select id="isoMode" aria-label="ISO attach mode">
+              <option value="cdrom">-cdrom (virtual CD-ROM)</option>
+              <option value="drive">-drive file=...,media=cdrom (explicit drive)</option>
+            </select>
+          </label>
+        </div>
+
+        <!-- Advanced -->
+        <div style="margin-bottom:12px">
+          <h3 style="margin:0 0 6px 0">Advanced & Extras</h3>
+          <label>
+            Boot order
+            <input id="bootOrder" type="text" value="dc" aria-label="Boot order" />
+            <span class="small muted">Example: "dc" (disk then cdrom), use letters: a=floppy, b=disk (IDE/virtio), c? (not standardized), d=cdrom</span>
+          </label>
+
+          <label class="form-row" aria-label="Network options">
+            <span style="min-width:110px">Network</span>
+            <select id="netMode" aria-label="Network mode">
+              <option value="user">user (SLIRP; default NAT)</option>
+              <option value="tap">tap (host bridge; requires setup)</option>
+              <option value="none">none</option>
+            </select>
+            <span style="min-width:80px">Extra args</span>
+            <input id="extraArgs" type="text" placeholder="-enable-kvm -snapshot" aria-label="Extra qemu args">
+          </label>
+        </div>
+
+        <!-- Generated command + actions -->
+        <div>
+          <h3 style="margin:0 0 6px 0">Generated QEMU Command</h3>
+          <pre id="commandOutput" class="command" tabindex="0"># Press "Start" to generate a QEMU command</pre>
+          <div class="controls" style="margin-top:8px">
+            <button id="copyCmdBtn" class="btn">Copy to clipboard</button>
+            <button id="downloadScriptBtn" class="btn">Download script</button>
+            <button id="validateBtn" class="btn ghost">Validate</button>
+            <button id="resetBtn" class="btn ghost">Reset to defaults</button>
+          </div>
+          <p class="note">Note: This UI is client-side only. Replace local filenames with host paths on the machine that will run QEMU.</p>
+        </div>
+
+        <hr style="margin:12px 0;border:none;border-top:1px solid #eef6ff" />
+
+        <h3 style="margin:0 0 6px 0">Extras: save/load and presets</h3>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+          <button id="presetLegacyBtn" class="btn">Preset: Legacy DOS (SB16 + Adlib)</button>
+          <button id="presetModernBtn" class="btn">Preset: Modern Linux (HDA + AC97)</button>
+          <button id="presetMixBtn" class="btn">Preset: Mixed</button>
+        </div>
+      </section>
+    </div>
+
+    <footer>
+      <small>QEMU Config Builder — single-file HTML. For production control, add a secure backend and a VM manager (QMP/libvirt). Created as a comprehensive frontend demonstration.</small>
+    </footer>
+  </div>
+
+  <script>
+    /*
+      Comprehensive JS to power the QEMU Config Builder.
+      - 13 sound cards (soundhw/device/placeholder)
+      - 20 machine types per arch
+      - Disk management (HDA..HDD)
+      - ISO, boot order, network, extras
+      - Save/load config to localStorage
+      - Presets and validation
+      - Generate QEMU command string with readable escaping
+      - Copy, download, export JSON
+    */
+
+    // Machine type lists (20 each)
+    const machineTypes = {
+      x64: [
+        "pc", "pc-q35-7.0", "pc-i440fx-7.0", "pc-6.1", "q35", "q35-6.1",
+        "pc-i440fx-4.2", "pc-i440fx-5.1", "pc-q35-5.2", "pc-3.1",
+        "pc-2.12", "pc-2.11", "pc-2.10", "pc-2.9", "pc-2.8",
+        "pc-2.7", "pc-2.6", "pc-2.5", "pc-2.4", "pc-legacy"
+      ],
+      x32: [
+        "isapc", "pc", "pc-legacy", "pc-i440fx-2.1", "pc-i440fx-3.1",
+        "pc-2.12", "pc-2.11", "pc-2.10", "pc-2.9", "pc-2.8",
+        "pc-2.7", "pc-2.6", "pc-2.5", "pc-2.4", "i386-3.1",
+        "i386-4.2", "i386-5.0", "i386-6.0", "i386-old", "i386-min"
+      ]
+    };
+
+    // SOUND CARDS: 13 options
+    // type: 'soundhw' => -soundhw entries; 'device' => -device <model>; 'placeholder' => comment to user
+    const soundCards = [
+      { id: 'sb16', label: 'Sound Blaster 16 (sb16)', type: 'soundhw', flag: 'sb16' },
+      { id: 'adlib', label: 'AdLib OPL2 (adlib)', type: 'soundhw', flag: 'adlib' },
+      { id: 'gus', label: 'Gravis Ultrasound (gus)', type: 'soundhw', flag: 'gus' },
+      { id: 'es1370', label: 'ESS ES1370 (es1370)', type: 'soundhw', flag: 'es1370' },
+      { id: 'opl3', label: 'OPL3 (opl3)', type: 'soundhw', flag: 'opl3' },
+      { id: 'pcspk', label: 'PC Speaker (pcspk)', type: 'soundhw', flag: 'pcspk' },
+      { id: 'ac97', label: 'Intel AC97 (ac97)', type: 'soundhw', flag: 'ac97' },
+      { id: 'cs4231a', label: 'CS4231A (cs4231a)', type: 'soundhw', flag: 'cs4231a' },
+      { id: 'ich9-hda', label: 'Intel HDA (ich9-intel-hda)', type: 'device', flag: 'ich9-intel-hda' },
+      { id: 'emu10k1', label: 'Creative EMU10K1 (emu10k1)', type: 'device', flag: 'emu10k1' },
+      { id: 'sb16-compat', label: 'SB16 Compatibility (placeholder)', type: 'placeholder', flag: 'sb16-compat' },
+      { id: 'custom1', label: 'Custom / Other device (placeholder)', type: 'placeholder', flag: 'CUSTOM_DEVICE' },
+      { id: 'custom2', label: 'Custom (alternate) (placeholder)', type: 'placeholder', flag: 'CUSTOM_DEVICE_2' }
+    ];
+
+    // Disk formats mapping (for -drive format=)
+    const formatMap = {
+      'qcow2': 'qcow2',
+      'vhd': 'vpc',
+      'vdi': 'vdi',
+      'vmdk': 'vmdk',
+      'img': 'raw'
+    };
+
+    // DOM elements
+    const archSelect = document.getElementById('archSelect');
+    const machineSelect = document.getElementById('machineSelect');
+    const memInput = document.getElementById('memInput');
+    const cpuInput = document.getElementById('cpuInput');
+    const vgaSelect = document.getElementById('vgaSelect');
+    const kvmSelect = document.getElementById('kvmSelect');
+
+    const soundOptionsContainer = document.getElementById('soundOptions');
+
+    const disksContainer = document.getElementById('disksContainer');
+    const addDiskBtn = document.getElementById('addDiskBtn');
+    const clearDisksBtn = document.getElementById('clearDisksBtn');
+
+    const isoInput = document.getElementById('isoInput');
+    const isoMode = document.getElementById('isoMode');
+
+    const bootOrder = document.getElementById('bootOrder');
+    const netMode = document.getElementById('netMode');
+    const extraArgs = document.getElementById('extraArgs');
+
+    const commandOutput = document.getElementById('commandOutput');
+    const copyCmdBtn = document.getElementById('copyCmdBtn');
+    const downloadScriptBtn = document.getElementById('downloadScriptBtn');
+    const validateBtn = document.getElementById('validateBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const suspendBtn = document.getElementById('suspendBtn');
+    const vmStateEl = document.getElementById('vmState');
+
+    const saveConfigBtn = document.getElementById('saveConfigBtn');
+    const loadConfigBtn = document.getElementById('loadConfigBtn');
+    const exportJsonBtn = document.getElementById('exportJsonBtn');
+    const savedList = document.getElementById('savedList');
+
+    const presetLegacyBtn = document.getElementById('presetLegacyBtn');
+    const presetModernBtn = document.getElementById('presetModernBtn');
+    const presetMixBtn = document.getElementById('presetMixBtn');
+
+    // VM state (simulated)
+    let vmState = 'stopped'; // stopped, running, paused, suspended
+
+    // Disk slots and max
+    const diskSlots = ['HDA','HDB','HDC','HDD'];
+    const maxDisks = 4;
+
+    // Initialization
+    function populateMachineSelect(){
+      const arch = archSelect.value === 'x64' ? 'x64' : 'x32';
+      machineSelect.innerHTML = '';
+      machineTypes[arch].slice(0,20).forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = m;
+        machineSelect.appendChild(opt);
+      });
+    }
+
+    function renderSoundOptions(){
+      soundOptionsContainer.innerHTML = '';
+      soundCards.forEach(sc => {
+        const div = document.createElement('div');
+        div.className = 'sound-option';
+        const chk = document.createElement('input');
+        chk.type = 'checkbox';
+        chk.id = 'sound-' + sc.id;
+        chk.dataset.type = sc.type;
+        chk.dataset.flag = sc.flag;
+        chk.setAttribute('aria-label', sc.label);
+
+        const lbl = document.createElement('label');
+        lbl.htmlFor = chk.id;
+        lbl.innerText = sc.label;
+
+        div.appendChild(chk);
+        div.appendChild(lbl);
+        soundOptionsContainer.appendChild(div);
+      });
+    }
+
+    function createDiskRow(index){
+      const row = document.createElement('div');
+      row.className = 'disk-row';
+      row.dataset.index = index;
+
+      const slotSel = document.createElement('select');
+      diskSlots.forEach((s, i) => {
+        const o = document.createElement('option');
+        o.value = i;
+        o.textContent = s;
+        slotSel.appendChild(o);
+      });
+      slotSel.value = index;
+      slotSel.className = 'small';
+
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = '.qcow2,.vhd,.vdi,.vmdk,.img,application/octet-stream';
+      fileInput.className = 'file-input';
+      fileInput.ariaLabel = 'Disk image file';
+
+      const fmtSel = document.createElement('select');
+      ['qcow2','vhd','vdi','vmdk','img'].forEach(fmt => {
+        const o = document.createElement('option');
+        o.value = fmt;
+        o.textContent = fmt.toUpperCase();
+        fmtSel.appendChild(o);
+      });
+
+      const rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'btn';
+      rm.textContent = 'Remove';
+      rm.addEventListener('click', () => {
+        row.remove();
+        refreshDiskIndices();
+      });
+
+      row.appendChild(slotSel);
+      row.appendChild(fileInput);
+      row.appendChild(fmtSel);
+      row.appendChild(rm);
+      return row;
+    }
+
+    function refreshDiskIndices(){
+      const rows = Array.from(disksContainer.querySelectorAll('.disk-row'));
+      const used = {};
+      rows.forEach(r => {
+        const slot = r.querySelector('select').value;
+        if (used[slot]) {
+          // find first free
+          for (let i=0;i<maxDisks;i++){
+            if(!used[i]){
+              r.querySelector('select').value = i;
+              used[i] = true;
+              break;
+            }
+          }
+        } else {
+          used[slot] = true;
+        }
+      });
+    }
+
+    addDiskBtn.addEventListener('click', () => {
+      const count = disksContainer.querySelectorAll('.disk-row').length;
+      if (count >= maxDisks){
+        alert('Maximum ' + maxDisks + ' disks allowed.');
+        return;
+      }
+      const row = createDiskRow(count);
+      disksContainer.appendChild(row);
+    });
+
+    clearDisksBtn.addEventListener('click', () => {
+      disksContainer.innerHTML = '';
+    });
+
+    // VM state UI helpers
+    function updateVmButtons(){
+      startBtn.disabled = vmState === 'running';
+      stopBtn.disabled = vmState === 'stopped';
+      pauseBtn.disabled = vmState !== 'running';
+      suspendBtn.disabled = (vmState === 'suspended' || vmState === 'stopped');
+      vmStateEl.textContent = 'State: ' + vmState;
+    }
+
+    startBtn.addEventListener('click', () => {
+      vmState = 'running';
+      updateVmButtons();
+      const cmd = buildQemuCommand();
+      commandOutput.textContent = cmd;
+      // Simulated: in a production system we'd POST this to a backend to start the VM
+    });
+
+    stopBtn.addEventListener('click', () => {
+      vmState = 'stopped';
+      updateVmButtons();
+      commandOutput.textContent = '# VM stopped';
+    });
+
+    pauseBtn.addEventListener('click', () => {
+      if (vmState === 'running') {
+        vmState = 'paused';
+        pauseBtn.textContent = 'Resume';
+      } else if (vmState === 'paused') {
+        vmState = 'running';
+        pauseBtn.textContent = 'Pause';
+      }
+      updateVmButtons();
+    });
+
+    suspendBtn.addEventListener('click', () => {
+      vmState = 'suspended';
+      updateVmButtons();
+    });
+
+    // Build QEMU command string
+    function buildQemuCommand(){
+      const arch = archSelect.value;
+      const qemuBin = arch === 'x64' ? 'qemu-system-x86_64' : 'qemu-system-i386';
+      const machine = machineSelect.value || '';
+      const mem = parseInt(memInput.value) || 1024;
+      const cpus = parseInt(cpuInput.value) || 1;
+      const vga = vgaSelect.value;
+      const kvm = kvmSelect.value;
+      const boot = bootOrder.value || 'dc';
+      const net = netMode.value || 'user';
+      const extra = extraArgs.value || '';
+
+      const parts = [qemuBin];
+
+      if (machine) parts.push('-machine ' + escapeShell(machine));
+      parts.push('-m ' + mem);
+      parts.push('-smp ' + cpus);
+
+      // VGA
+      if (vga && vga !== 'none') parts.push('-vga ' + escapeShell(vga));
+
+      // KVM option
+      if (kvm === 'auto') parts.push('-enable-kvm');
+
+      // Sound handling
+      const checked = Array.from(soundOptionsContainer.querySelectorAll('input[type=checkbox]:checked'));
+      const soundhw = [];
+      const devices = [];
+      const placeholders = [];
+      checked.forEach(chk => {
+        const t = chk.dataset.type;
+        const f = chk.dataset.flag;
+        if (t === 'soundhw') soundhw.push(f);
+        else if (t === 'device') devices.push(f);
+        else placeholders.push(f);
+      });
+      if (soundhw.length) parts.push('-soundhw ' + escapeShell(soundhw.join(',')));
+      devices.forEach(d => parts.push('-device ' + escapeShell(d)));
+      placeholders.forEach(p => parts.push('# placeholder: add sound device -> ' + p));
+
+      // Disks
+      const rows = Array.from(disksContainer.querySelectorAll('.disk-row'));
+      // We'll attach as IDE if=ide,index=X for HDA..HDD mapping
+      rows.forEach(r => {
+        const slotIndex = parseInt(r.querySelector('select').value, 10);
+        const fileEl = r.querySelector('input[type=file]');
+        const fmt = r.querySelector('select').value;
+        if (fileEl.files && fileEl.files.length > 0) {
+          const f = fileEl.files[0];
+          const name = f.name;
+          const format = formatMap[fmt] || 'raw';
+          parts.push('-drive file=' + escapeShell(name) + ',format=' + escapeShell(format) + ',if=ide,index=' + slotIndex);
+        }
+      });
+
+      // ISO
+      if (isoInput.files && isoInput.files.length > 0) {
+        const iso = isoInput.files[0];
+        if (isoMode.value === 'cdrom') parts.push('-cdrom ' + escapeShell(iso.name));
+        else parts.push('-drive file=' + escapeShell(iso.name) + ',media=cdrom,if=ide');
+      }
+
+      // Network
+      if (net === 'user') parts.push('-netdev user,id=net0 -device e1000,netdev=net0');
+      else if (net === 'tap') parts.push('# Note: tap needs host setup: -netdev tap,id=net0,ifname=tap0,script=no -device e1000,netdev=net0');
+      else if (net === 'none') parts.push('-net none');
+
+      // Boot order and extras
+      if (boot) parts.push('-boot order=' + escapeShell(boot));
+      if (extra) parts.push(extra);
+
+      // Display and monitor
+      parts.push('-display default');
+
+      // Join with line continuations for a shell script
+      const cmd = parts.join(' \\\n  ');
+      const header = '# Generated QEMU command (replace filenames with host paths before running):\\n';
+      return header + cmd;
+    }
+
+    // Simple shell escaping for display
+    function escapeShell(s){
+      if (!s) return s;
+      if (/[^A-Za-z0-9._\\/-=,]/.test(s)) {
+        return "'" + s.replace(/'/g, "'\\''") + "'";
+      }
+      return s;
+    }
+
+    // Copy to clipboard
+    copyCmdBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(commandOutput.textContent);
+        copyCmdBtn.textContent = 'Copied!';
+        setTimeout(()=> copyCmdBtn.textContent='Copy to clipboard',1500);
+      } catch (e){
+        alert('Copy failed: ' + e);
+      }
+    });
+
+    // Download as script
+    downloadScriptBtn.addEventListener('click', () => {
+      const content = '#!/bin/sh\\n' + commandOutput.textContent + '\\n';
+      const blob = new Blob([content], {type:'text/x-sh'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'start-qemu.sh';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    });
+
+    // Validate: quick checks
+    validateBtn.addEventListener('click', () => {
+      const errs = [];
+      // if user selected none sound & recommended sb16 maybe warn (just an example)
+      // Check disk file count vs duplicates
+      const rows = Array.from(disksContainer.querySelectorAll('.disk-row'));
+      const usedSlots = {};
+      rows.forEach((r, i) => {
+        const slot = r.querySelector('select').value;
+        if (usedSlots[slot]) errs.push('Duplicate disk slot: ' + diskSlots[slot]);
+        usedSlots[slot] = true;
+        const fileEl = r.querySelector('input[type=file]');
+        if (!fileEl.files || fileEl.files.length === 0) errs.push('Disk row ' + (i+1) + ' has no file selected.');
+      });
+      if (errs.length) alert('Validation found issues:\\n- ' + errs.join('\\n- '));
+      else alert('Validation passed (basic checks).');
+    });
+
+    // Reset defaults
+    resetBtn.addEventListener('click', () => {
+      if (!confirm('Reset to defaults?')) return;
+      archSelect.value = 'x64';
+      populateMachineSelect();
+      memInput.value = 2048;
+      cpuInput.value = 2;
+      vgaSelect.value = 'std';
+      kvmSelect.value = 'auto';
+      extraArgs.value = '';
+      diskSlots.forEach(() => {}); // no-op
+      disksContainer.innerHTML = '';
+      addDiskBtn.click();
+      soundOptionsContainer.querySelectorAll('input[type=checkbox]').forEach(c=>c.checked=false);
+      isoInput.value = '';
+      bootOrder.value = 'dc';
+      netMode.value = 'user';
+      commandOutput.textContent = '# Press "Start" to generate a QEMU command';
+    });
+
+    // Save / Load config to localStorage
+    function getConfigObject(){
+      const cfg = {
+        arch: archSelect.value,
+        machine: machineSelect.value,
+        mem: memInput.value,
+        cpus: cpuInput.value,
+        vga: vgaSelect.value,
+        kvm: kvmSelect.value,
+        sound: Array.from(soundOptionsContainer.querySelectorAll('input[type=checkbox]'))
+                .filter(c=>c.checked).map(c=>c.dataset.flag),
+        disks: Array.from(disksContainer.querySelectorAll('.disk-row')).map(r=>{
+          const slot = r.querySelector('select').value;
+          const fmt = r.querySelector('select').value;
+          const files = r.querySelector('input[type=file]').files;
+          return {
+            slot: slot,
+            format: fmt,
+            filename: files && files.length ? files[0].name : ''
+          };
+        }),
+        iso: isoInput.files && isoInput.files.length ? isoInput.files[0].name : '',
+        isoMode: isoMode.value,
+        bootOrder: bootOrder.value,
+        network: netMode.value,
+        extra: extraArgs.value
+      };
+      return cfg;
+    }
+
+    function saveConfigToStorage(name, cfg){
+      const store = JSON.parse(localStorage.getItem('qemu_builder_saved') || '{}');
+      store[name] = cfg;
+      localStorage.setItem('qemu_builder_saved', JSON.stringify(store));
+      renderSavedList();
+    }
+
+    function loadConfigFromStorage(name){
+      const store = JSON.parse(localStorage.getItem('qemu_builder_saved') || '{}');
+      return store[name];
+    }
+
+    function removeConfigFromStorage(name){
+      const store = JSON.parse(localStorage.getItem('qemu_builder_saved') || '{}');
+      delete store[name];
+      localStorage.setItem('qemu_builder_saved', JSON.stringify(store));
+      renderSavedList();
+    }
+
+    function renderSavedList(){
+      const store = JSON.parse(localStorage.getItem('qemu_builder_saved') || '{}');
+      savedList.innerHTML = '';
+      Object.keys(store).forEach(key => {
+        const item = document.createElement('div');
+        item.className = 'chip';
+        const label = document.createElement('div');
+        label.textContent = key;
+        const loadBtn = document.createElement('button');
+        loadBtn.className = 'btn ghost';
+        loadBtn.textContent = 'Load';
+        loadBtn.addEventListener('click', () => {
+          if (!confirm('Load config "'+key+'"? This will overwrite current settings.')) return;
+          applyConfigObject(store[key]);
+        });
+        const delBtn = document.createElement('button');
+        delBtn.className = 'btn';
+        delBtn.textContent = 'Delete';
+        delBtn.addEventListener('click', () => {
+          if (!confirm('Delete saved config "'+key+'"?')) return;
+          removeConfigFromStorage(key);
+        });
+        item.appendChild(label);
+        item.appendChild(loadBtn);
+        item.appendChild(delBtn);
+        savedList.appendChild(item);
+      });
+      if (Object.keys(store).length === 0){
+        savedList.innerHTML = '<div class="small muted">No saved configs</div>';
+      }
+    }
+
+    saveConfigBtn.addEventListener('click', () => {
+      const name = prompt('Name for this config (no slashes):');
+      if (!name) return;
+      const cfg = getConfigObject();
+      saveConfigToStorage(name, cfg);
+      alert('Config saved as "' + name + '"');
+    });
+
+    loadConfigBtn.addEventListener('click', () => {
+      const store = JSON.parse(localStorage.getItem('qemu_builder_saved') || '{}');
+      const keys = Object.keys(store);
+      if (keys.length === 0) { alert('No saved configs'); return; }
+      const name = prompt('Load which config? Available: ' + keys.join(',\\n'));
+      if (!name) return;
+      const cfg = loadConfigFromStorage(name);
+      if (!cfg) { alert('Config not found'); return; }
+      applyConfigObject(cfg);
+    });
+
+    exportJsonBtn.addEventListener('click', () => {
+      const cfg = getConfigObject();
+      const blob = new Blob([JSON.stringify(cfg, null, 2)], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'qemu-config.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    });
+
+    function applyConfigObject(cfg){
+      if (!cfg) return;
+      archSelect.value = cfg.arch || 'x64';
+      populateMachineSelect();
+      if (cfg.machine) machineSelect.value = cfg.machine;
+      memInput.value = cfg.mem || 1024;
+      cpuInput.value = cfg.cpus || 1;
+      vgaSelect.value = cfg.vga || 'std';
+      kvmSelect.value = cfg.kvm || 'auto';
+      // apply sound
+      soundOptionsContainer.querySelectorAll('input[type=checkbox]').forEach(c=>{
+        c.checked = (cfg.sound || []).indexOf(c.dataset.flag) !== -1;
+      });
+      // disks: clear, then re-create rows
+      disksContainer.innerHTML = '';
+      (cfg.disks || []).forEach((d, idx) => {
+        const row = createDiskRow(idx);
+        // select slot
+        row.querySelector('select').value = d.slot || idx;
+        // format
+        row.querySelector('select:nth-of-type(2)').value = d.format || 'qcow2';
+        // file cannot be set programmatically for security; keep filename in placeholder text
+        if (d.filename){
+          const info = document.createElement('div');
+          info.className = 'small muted';
+          info.textContent = 'Selected file (placeholder): ' + d.filename;
+          row.appendChild(info);
+        }
+        disksContainer.appendChild(row);
+      });
+      isoInput.value = '';
+      if (cfg.iso){
+        const info = document.createElement('div');
+        info.className = 'small muted';
+        info.textContent = 'Selected ISO (placeholder): ' + cfg.iso;
+        // append to disksContainer area as visible hint: (not ideal, but helps)
+        disksContainer.parentElement.querySelector('#isoInput')?.parentElement?.appendChild(info);
+      }
+      isoMode.value = cfg.isoMode || 'cdrom';
+      bootOrder.value = cfg.bootOrder || 'dc';
+      netMode.value = cfg.network || 'user';
+      extraArgs.value = cfg.extra || '';
+      commandOutput.textContent = '# Config loaded. Press Start to generate command';
+    }
+
+    // Presets
+    presetLegacyBtn.addEventListener('click', () => {
+      // SB16 + Adlib, small RAM, 1 CPU, DOS-friendly
+      archSelect.value = 'x32';
+      populateMachineSelect();
+      machineSelect.value = machineSelect.options[0].value;
+      memInput.value = 64;
+      cpuInput.value = 1;
+      vgaSelect.value = 'std';
+      soundOptionsContainer.querySelectorAll('input[type=checkbox]').forEach(c=>c.checked=false);
+      document.getElementById('sound-sb16').checked = true;
+      document.getElementById('sound-adlib').checked = true;
+      disksContainer.innerHTML = '';
+      addDiskBtn.click();
+      bootOrder.value = 'dc';
+      netMode.value = 'none';
+    });
+
+    presetModernBtn.addEventListener('click', () => {
+      // Modern Linux: x64, AC97, HDA, 2 GB RAM
+      archSelect.value = 'x64';
+      populateMachineSelect();
+      memInput.value = 2048;
+      cpuInput.value = 2;
+      vgaSelect.value = 'qxl';
+      soundOptionsContainer.querySelectorAll('input[type=checkbox]').forEach(c=>c.checked=false);
+      document.getElementById('sound-ac97').checked = true;
+      disksContainer.innerHTML = '';
+      addDiskBtn.click();
+      bootOrder.value = 'dc';
+      netMode.value = 'user';
+    });
+
+    presetMixBtn.addEventListener('click', () => {
+      archSelect.value = 'x64';
+      populateMachineSelect();
+      memInput.value = 1024;
+      cpuInput.value = 2;
+      vgaSelect.value = 'std';
+      soundOptionsContainer.querySelectorAll('input[type=checkbox]').forEach(c=>c.checked=false);
+      document.getElementById('sound-sb16').checked = true;
+      document.getElementById('sound-ac97').checked = true;
+      disksContainer.innerHTML = '';
+      addDiskBtn.click(); addDiskBtn.click();
+      bootOrder.value = 'dc';
+      netMode.value = 'user';
+    });
+
+    // initial render
+    populateMachineSelect();
+    renderSoundOptions();
+    renderSavedList();
+    // add a default disk row so UI isn't empty
+    addDiskBtn.click();
+
+    // Accessibility: keyboard shortcut Ctrl+G to generate command
+    window.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'g'){
+        const cmd = buildQemuCommand();
+        commandOutput.textContent = cmd;
+      }
+    });
+
+    // Expose some functions for debugging in console
+    window.qemuBuilder = {
+      buildQemuCommand,
+      getConfigObject,
+      applyConfigObject
+    };
+
+    // End of JS
+  </script>
+</body>
+</html>
